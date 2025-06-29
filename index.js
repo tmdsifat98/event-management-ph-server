@@ -24,6 +24,7 @@ async function run() {
   try {
     const db = client.db("eventDB");
     const usersCollection = db.collection("users");
+    const eventsCollection = db.collection("events");
 
     //signUp and store user in db api
     app.post("/register", async (req, res) => {
@@ -50,10 +51,10 @@ async function run() {
 
       const user = await usersCollection.findOne({ email });
       if (!user) {
-        return res.status(400).send({ message: "Invalid credentials." });
+        return res.status(400).send("Invalid credentials");
       }
       if (password !== user.password) {
-        return res.status(400).send({ message: "Invalid credentials." });
+        return res.status(400).send("Invalid password");
       }
       res.send({
         message: "Login successful.",
@@ -63,6 +64,24 @@ async function run() {
           photoURL: user.photoURL,
         },
       });
+    });
+
+    //add event api
+    app.post("/events", async (req, res) => {
+      const { title, name, dateTime, location, description } = req.body;
+
+      const newEvent = {
+        title,
+        name,
+        dateTime,
+        location,
+        description,
+        attendeeCount: 0,
+      };
+
+      const result = await eventsCollection.insertOne(newEvent);
+
+      res.send(result);
     });
 
     await client.connect();
