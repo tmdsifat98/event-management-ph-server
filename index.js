@@ -1,6 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
 
 const app = express();
@@ -68,18 +68,37 @@ async function run() {
 
     //add event api
     app.post("/events", async (req, res) => {
-      const { title, name, dateTime, location, description } = req.body;
-
-      const newEvent = {
-        title,
-        name,
-        dateTime,
-        location,
-        description,
-        attendeeCount: 0,
-      };
-
+      const newEvent = req.body;
       const result = await eventsCollection.insertOne(newEvent);
+
+      res.send(result);
+    });
+
+    //get all event api
+    app.get("/events", async (req, res) => {
+      const result = await eventsCollection
+        .find()
+        .sort({ dateAndTime: -1 })
+        .toArray();
+
+      res.send(result);
+    });
+
+    //increase atendee and email based atendee look
+    app.patch("/events/:id/join", async (req, res) => {
+      const eventId = req.params.id;
+      const { userEmail } = req.body;
+
+      const result = await eventsCollection.updateOne(
+        {
+          _id: new ObjectId(eventId),
+          atendee: { $ne: userEmail },
+        },
+        {
+          $inc: { atendeeCount: 1 },
+          $addToSet: { atendee: userEmail },
+        }
+      );
 
       res.send(result);
     });
