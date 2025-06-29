@@ -99,7 +99,27 @@ async function run() {
           $addToSet: { atendee: userEmail },
         }
       );
+      res.send(result);
+    });
 
+    //get event by specific email
+    app.get("/events/user/:email", async (req, res) => {
+      const email = req.params.email;
+      const events = await eventsCollection
+        .find({ userEmail: email })
+        .toArray();
+      res.send(events);
+    });
+
+    //update event details api
+    app.patch("/events/:id", async (req, res) => {
+      const id = req.params.id;
+      const updatedData = req.body;
+
+      const result = await eventsCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: updatedData }
+      );
       res.send(result);
     });
 
