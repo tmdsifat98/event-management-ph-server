@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
+const moment = require("moment");
 
 const app = express();
 
@@ -78,13 +79,85 @@ async function run() {
     app.get("/events", async (req, res) => {
       const result = await eventsCollection
         .find()
-        .sort({ dateAndTime: -1 })
+        .sort({ createdAt: -1 })
         .toArray();
 
       res.send(result);
     });
 
-    //increase atendee and email based atendee look
+    app.get("/events/search", async (req, res) => {
+      const { title, filter } = req.query;
+
+      const query = {};
+      let start, end;
+
+      const now = new Date();
+
+      // Title search
+      if (title) {
+        query.eventTitle = { $regex: title, $options: "i" };
+      }
+
+      // filter by date
+      if (filter === "today") {
+        start = new Date(now.setHours(0, 0, 0, 0));
+        end = new Date(now.setHours(23, 59, 59, 999));
+      } else if (filter === "currentWeek") {
+        const day = now.getDay(); // Sunday=0, Monday=1
+        const diffToMonday = day === 0 ? -6 : 1 - day;
+        start = new Date(now);
+        start.setDate(now.getDate() + diffToMonday);
+        start.setHours(0, 0, 0, 0);
+
+        end = new Date(start);
+        end.setDate(start.getDate() + 6);
+        end.setHours(23, 59, 59, 999);
+      } else if (filter === "lastWeek") {
+        const day = now.getDay();
+        const diffToMonday = day === 0 ? -6 : 1 - day;
+        end = new Date(now);
+        end.setDate(now.getDate() + diffToMonday - 1);
+        end.setHours(23, 59, 59, 999);
+
+        start = new Date(end);
+        start.setDate(end.getDate() - 6);
+        start.setHours(0, 0, 0, 0);
+      } else if (filter === "currentMonth") {
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        end = new Date(
+          now.getFullYear(),
+          now.getMonth() + 1,
+          0,
+          23,
+          59,
+          59,
+          999
+        );
+      } else if (filter === "lastMonth") {
+        start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+      }
+
+      if (start && end) {
+        query.dateAndTime = {
+          $gte: start.toISOString(),
+          $lte: end.toISOString(),
+        };
+      }
+
+      let result;
+      //if no search exist
+      if (!title && !filter) {
+        result = await eventsCollection.find().toArray();
+      } else {
+        //if query exist
+        result = await eventsCollection.find(query).toArray();
+      }
+
+      res.send(result);
+    });
+
+    //increase attendee and email based attendee look
     app.patch("/events/:id/join", async (req, res) => {
       const eventId = req.params.id;
       const { userEmail } = req.body;
@@ -92,11 +165,11 @@ async function run() {
       const result = await eventsCollection.updateOne(
         {
           _id: new ObjectId(eventId),
-          atendee: { $ne: userEmail },
+          attendee: { $ne: userEmail },
         },
         {
-          $inc: { atendeeCount: 1 },
-          $addToSet: { atendee: userEmail },
+          $inc: { attendeeCount: 1 },
+          $addToSet: { attendee: userEmail },
         }
       );
       res.send(result);
@@ -120,6 +193,16 @@ async function run() {
         { _id: new ObjectId(id) },
         { $set: updatedData }
       );
+      res.send(result);
+    });
+
+    //delete event api
+    app.delete("/events/:id", async (req, res) => {
+      const id = req.params.id;
+
+      const result = await eventsCollection.deleteOne({
+        _id: new ObjectId(id),
+      });
       res.send(result);
     });
 
