@@ -1,15 +1,13 @@
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
-require("dotenv").config();
-const moment = require("moment");
 
 const app = express();
-
-app.use(express.json());
-app.use(cors());
-
 const port = process.env.PORT || 3000;
+
+app.use(cors());
+app.use(express.json());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@alpha10.qadkib3.mongodb.net/?retryWrites=true&w=majority&appName=Alpha10`;
 
@@ -85,6 +83,7 @@ async function run() {
       res.send(result);
     });
 
+    //get event by search and filter
     app.get("/events/search", async (req, res) => {
       const { title, filter } = req.query;
 
@@ -103,7 +102,7 @@ async function run() {
         start = new Date(now.setHours(0, 0, 0, 0));
         end = new Date(now.setHours(23, 59, 59, 999));
       } else if (filter === "currentWeek") {
-        const day = now.getDay(); // Sunday=0, Monday=1
+        const day = now.getDay();
         const diffToMonday = day === 0 ? -6 : 1 - day;
         start = new Date(now);
         start.setDate(now.getDate() + diffToMonday);
@@ -148,12 +147,24 @@ async function run() {
       let result;
       //if no search exist
       if (!title && !filter) {
-        result = await eventsCollection.find().toArray();
+        result = await eventsCollection
+          .find()
+          .sort({ createdAt: -1 })
+          .toArray();
       } else {
         //if query exist
-        result = await eventsCollection.find(query).toArray();
+        result = await eventsCollection
+          .find(query)
+          .sort({ createdAt: -1 })
+          .toArray();
       }
 
+      res.send(result);
+    });
+    //get event by id
+    app.get("/events/:id", async (req, res) => {
+      const id = req.params.id;
+      const result = await eventsCollection.findOne({ _id: new ObjectId(id) });
       res.send(result);
     });
 
@@ -206,11 +217,11 @@ async function run() {
       res.send(result);
     });
 
-    await client.connect();
-    await client.db("admin").command({ ping: 1 });
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!"
-    );
+    // await client.connect();
+    // await client.db("admin").command({ ping: 1 });
+    // console.log(
+    //   "Pinged your deployment. You successfully connected to MongoDB!"
+    // );
   } finally {
   }
 }
